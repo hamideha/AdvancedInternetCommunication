@@ -3,16 +3,38 @@ from argparse import ArgumentParser
 import socket
 import sys
 
-GET_MIDTERM_AVG_CMD  = "GMA"
-GET_LAB_1_AVG_CMD    = "GL1A"
-GET_LAB_2_AVG_CMD    = "GL2A"
-GET_LAB_3_AVG_CMD    = "GL3A"
-GET_LAB_4_AVG_CMD    = "GL4A"
-GET_EXAM_1_AVG_CMD   = "GE1A"
-GET_EXAM_2_AVG_CMD   = "GE2A"
-GET_EXAM_3_AVG_CMD   = "GE3A"
-GET_EXAM_4_AVG_CMD   = "GE4A"
-GET_GRADES_CMD       = "GG"
+GET_MIDTERM_AVG = "GMA"
+GET_EXAM_AVG = "GEA"
+GET_LAB_1_AVG = "GL1A"
+GET_LAB_2_AVG = "GL2A"
+GET_LAB_3_AVG = "GL3A"
+GET_LAB_4_AVG = "GL4A"
+GET_GRADES = "GG"
+
+# Client needs access to encryption keys so we just hardcode them 🤷🏼‍♂️
+ENCRYPTION_KEYS = {
+    "1803933": "M7E8erO15CIh902P8DQsHxKbOADTgEPGHdiY0MplTuY=",
+    "1884159": "PWMKkdXW4VJ3pXBpr9UwjefmlIxYwPzk11Aw9TQ2wZQ=",
+    "1853847": "UVpoR9emIZDrpQ6pCLYopzE2Qm8bCrVyGEzdOOo2wXw=",
+    "1810192": "bHdhydsHzwKdb0RF4wG72yGm2a2L-CNzDl7vaWOu9KA=",
+    "1891352": "iHsXoe_5Fle-PHGtgZUCs5ariPZT-LNCUYpixMC3NxI=",
+    "1811313": "IR_IQPnIM1TI8h4USnBLuUtC72cQ-u4Fwvlu3q5npA0=",
+    "1804841": "kE8FpmTv8d8sRPIswQjCMaqunLUGoRNW6OrYU9JWZ4w=",
+    "1881925": "_B__AgO34W7urog-thBu7mRKj3AY46D8L26yedUwf0I=",
+    "1877711": "dLOM7DyrEnUsW-Q7OM6LXxZsbCFhjmyhsVT3P7oADqk=",
+    "1830894": "aM4bOtearz2GpURUxYKW23t_DlljFLzbfgWS-IRMB3U=",
+    "1855191": "-IieSn1zKJ8P3XOjyAlRcD2KbeFl_BnQjHyCE7-356w=",
+    "1821012": "Lt5wWqTM1q9gNAgME4T5-5oVptAstg9llB4A_iNAYMY=",
+    "1844339": "M6glRgMP5Y8CZIs-MbyFvev5VKW-zbWyUMMt44QCzG4=",
+    "1898468": "SS0XtthxP64E-z4oB1IsdrzJwu1PUq6hgFqP_u435AA=",
+    "1883633": "0L_o75AEsOay_ggDJtOFWkgRpvFvM0snlDm9gep786I=",
+    "1808742": "9BXraBysqT7QZLBjegET0e52WklQ7BBYWXvv8xpbvr8=",
+    "1863450": "M0PgiJutAM_L9jvyfrGDWnbfJOXmhYt_skL0S88ngkU=",
+    "1830190": "v-5GfMaI2ozfmef5BNO5hI-fEGwtKjuI1XcuTDh-wsg=",
+    "1835544": "LI14DbKGBfJExlwLodr6fkV4Pv4eABWkEhzArPbPSR8=",
+    "1820930": "zoTviAO0EACFC4rFereJuc0A-99Xf_uOdq3GiqUpoeU="
+}
+
 
 class Server:
     HOSTNAME = "0.0.0.0"
@@ -34,19 +56,34 @@ class Server:
 
             lines = f.readlines()
             for line in lines:
-                student = {}
+                student = {"grades": {}}
                 students_props = line.strip().split(',')
                 for i in range(len(students_props)):
-                    student.update({
-                        headers[i]: students_props[i]
-                    })
+                    if i < 3:
+                        student[headers[i]] = students_props[i]
+                    # Add grades to separate nested dict
+                    else:
+                        student["grades"][headers[i]] = students_props[i]
                 self.students.append(student)
             f.close()
         # Print the database
+        print(self.students)
         print("Data read from database:\n")
         print(fields)
         for line in lines:
-            print(line, end = '')
+            print(line, end='')
+
+    def read_command(self, command):
+        student_id = command.split(" ")[0]
+        self.current_student = next(
+            (student for student in self.students if student['ID Number'] == student_id), None)
+        if not self.current_student:
+            print("User not found")
+            return "User not found"
+        else:
+            print("User found")
+            # TODO: Handle different commands
+            return str(self.current_student["grades"])
 
     def create_listen_socket(self):
         try:
@@ -54,7 +91,7 @@ class Server:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind((Server.HOSTNAME, Server.PORT))
             self.socket.listen(Server.MAX_CONNECTION_BACKLOG)
-            print("Listening on port {}...".format(Server.PORT))
+            print(f"Listening on port {Server.PORT}...")
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -75,22 +112,24 @@ class Server:
         connection, address_port = client
         # Print the ip address and port of the client.
         print("-" * 72)
-        print("Connection received from {} on port {}.".format(address_port[0], address_port[1]))
+        print(
+            f"Connection received from {address_port[0]} on port {address_port[1]}.")
 
         while True:
             try:
                 recvd_bytes = connection.recv(Server.RECV_BUFFER_SIZE)
-            
+
                 if len(recvd_bytes) == 0:
                     print("Closing client connection ... ")
                     connection.close()
                     break
-                
+
                 recvd_str = recvd_bytes.decode(Server.MSG_ENCODING)
                 print("Received: ", recvd_str)
-                
-                connection.sendall(recvd_str.encode(Server.MSG_ENCODING))
-                print("Sent: ", recvd_str)
+
+                response_str = self.read_command(recvd_str)
+                connection.sendall(self.encrypt_message(response_str))
+                print("Sent: ", response_str)
 
             except KeyboardInterrupt:
                 print()
@@ -98,8 +137,14 @@ class Server:
                 connection.close()
                 break
 
+    def encrypt_message(self, message):
+        if not self.current_student:
+            return message.encode(Server.MSG_ENCODING)
+        fernet = Fernet(
+            self.current_student["Key"].encode(Server.MSG_ENCODING))
+        return fernet.encrypt(message.encode(Server.MSG_ENCODING))
 
-    
+
 class Client:
     SERVER_HOSTNAME = socket.gethostname()
     RECV_BUFFER_SIZE = 1024
@@ -123,15 +168,33 @@ class Client:
         except Exception as msg:
             print(msg)
             sys.exit(1)
-    
+
     def get_console_input(self):
         while True:
             if not self.student_id:
                 self.student_id = input("Student ID: ")
-            self.input_text = input("Input: ")
+            self.input_text = input("Command: ")
             if self.input_text != "":
+                print("Command Entered: ", self.input_text)
+                if self.input_text == GET_GRADES:
+                    print("Fetching Grades...")
+                elif self.input_text == GET_MIDTERM_AVG:
+                    print("Fetching Midterm Average...")
+                elif self.input_text == GET_EXAM_AVG:
+                    print("Fetching Exam 1 Average...")
+                elif self.input_text == GET_LAB_1_AVG:
+                    print("Fetching Lab 1 Average...")
+                elif self.input_text == GET_LAB_2_AVG:
+                    print("Fetching Lab 2 Average...")
+                elif self.input_text == GET_LAB_3_AVG:
+                    print("Fetching Lab 3 Average...")
+                elif self.input_text == GET_LAB_4_AVG:
+                    print("Fetching Lab 4 Average...")
+                else:
+                    print("Invalid command")
+                    continue
                 break
-    
+
     def send_console_input_forever(self):
         while True:
             try:
@@ -143,9 +206,10 @@ class Client:
                 print("Closing server connection ...")
                 self.socket.close()
                 sys.exit(1)
-                
+
     def connection_send(self):
         try:
+            # Send the student id with every request
             msg = self.student_id + " " + self.input_text
             self.socket.sendall(msg.encode(Server.MSG_ENCODING))
         except Exception as msg:
@@ -161,14 +225,22 @@ class Client:
                 self.socket.close()
                 sys.exit(1)
 
-            recvd_msg = recvd_bytes.decode(Server.MSG_ENCODING)
+            recvd_msg = self.decrypt_message(recvd_bytes)
             print("Received: ", recvd_msg)
-            if(recvd_msg == "User not found"):
+            if (recvd_msg == "User not found"):
                 self.student_id = ""
 
         except Exception as msg:
             print(msg)
             sys.exit(1)
+
+    def decrypt_message(self, message):
+        key = ENCRYPTION_KEYS.get(self.student_id)
+        if not key:
+            return message.decode(Server.MSG_ENCODING)
+        fernet = Fernet(key.encode(Server.MSG_ENCODING))
+        return fernet.decrypt(message).decode(Server.MSG_ENCODING)
+
 
 if __name__ == '__main__':
     roles = {'client': Client, 'server': Server}
