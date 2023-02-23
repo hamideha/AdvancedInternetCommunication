@@ -22,15 +22,31 @@ class Server:
     MSG_ENCODING = "utf-8"
 
     def __init__(self):
+        self.students = []
         self.read_csv("course_grades_2023.csv")
         self.create_listen_socket()
         self.process_connections_forever()
 
     def read_csv(self, filename):
         with open(filename) as f:
-            data = f.read()
+            fields = f.readline()
+            headers = fields.strip().split(',')
+
+            lines = f.readlines()
+            for line in lines:
+                student = {}
+                students_props = line.strip().split(',')
+                for i in range(len(students_props)):
+                    student.update({
+                        headers[i]: students_props[i]
+                    })
+                self.students.append(student)
+            f.close()
+        # Print the database
         print("Data read from database:\n")
-        print(data)
+        print(fields)
+        for line in lines:
+            print(line, end = '')
 
     def create_listen_socket(self):
         try:
@@ -73,7 +89,7 @@ class Server:
                 recvd_str = recvd_bytes.decode(Server.MSG_ENCODING)
                 print("Received: ", recvd_str)
                 
-                connection.sendall(recvd_bytes)
+                connection.sendall(recvd_str.encode(Server.MSG_ENCODING))
                 print("Sent: ", recvd_str)
 
             except KeyboardInterrupt:
@@ -89,6 +105,7 @@ class Client:
     RECV_BUFFER_SIZE = 1024
 
     def __init__(self):
+        self.student_id = ""
         self.get_socket()
         self.connect_to_server()
         self.send_console_input_forever()
@@ -109,6 +126,8 @@ class Client:
     
     def get_console_input(self):
         while True:
+            if not self.student_id:
+                self.student_id = input("Student ID: ")
             self.input_text = input("Input: ")
             if self.input_text != "":
                 break
@@ -127,7 +146,8 @@ class Client:
                 
     def connection_send(self):
         try:
-            self.socket.sendall(self.input_text.encode(Server.MSG_ENCODING))
+            msg = self.student_id + " " + self.input_text
+            self.socket.sendall(msg.encode(Server.MSG_ENCODING))
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -143,12 +163,12 @@ class Client:
 
             recvd_msg = recvd_bytes.decode(Server.MSG_ENCODING)
             print("Received: ", recvd_msg)
+            if(recvd_msg == "User not found"):
+                self.student_id = ""
 
         except Exception as msg:
             print(msg)
             sys.exit(1)
-
-   
 
 if __name__ == '__main__':
     roles = {'client': Client, 'server': Server}
