@@ -11,6 +11,13 @@ GET_LAB_3_AVG = "GL3A"
 GET_LAB_4_AVG = "GL4A"
 GET_GRADES = "GG"
 
+GMA = 0
+GEA = 0
+GL1A = 0
+GL2A = 0
+GL3A = 0
+GL4A = 0
+
 # Client needs access to encryption keys so we just hardcode them 🤷🏼‍♂️
 ENCRYPTION_KEYS = {
     "1803933": "M7E8erO15CIh902P8DQsHxKbOADTgEPGHdiY0MplTuY=",
@@ -50,6 +57,13 @@ class Server:
         self.process_connections_forever()
 
     def read_csv(self, filename):
+        global GMA
+        global GEA
+        global GL1A
+        global GL2A
+        global GL3A
+        global GL4A
+
         with open(filename) as f:
             fields = f.readline()
             headers = fields.strip().split(',')
@@ -68,13 +82,32 @@ class Server:
             f.close()
         # Print the database
         print(self.students)
-        print("Data read from database:\n")
+        print("\n\nData read from database:\n")
         print(fields)
+
+        number_of_students = 0
+
         for line in lines:
             print(line, end='')
+            GMA += float(line.split(",")[7])
+            GEA += (float(line.split(",")[8]) + float(line.split(",")[9]) +
+                    float(line.split(",")[10]) + float(line.split(",")[11]))/4
+            GL1A += float(line.split(",")[3])
+            GL2A += float(line.split(",")[4])
+            GL3A += float(line.split(",")[5])
+            GL4A += float(line.split(",")[6])
+            number_of_students += 1
+
+        GMA /= number_of_students
+        GEA /= number_of_students
+        GL1A /= number_of_students
+        GL2A /= number_of_students
+        GL3A /= number_of_students
+        GL4A /= number_of_students
 
     def read_command(self, command):
         student_id = command.split(" ")[0]
+        current_command = command.split(" ")[1]
         self.current_student = next(
             (student for student in self.students if student['ID Number'] == student_id), None)
         if not self.current_student:
@@ -83,7 +116,24 @@ class Server:
         else:
             print("User found")
             # TODO: Handle different commands
-            return str(self.current_student["grades"])
+
+            match current_command:
+                case "GMA":
+                    return str(GMA)
+                case "GEA":
+                    return str(GEA)
+                case "GL1A":
+                    return str(GL1A)
+                case "GL2A":
+                    return str(GL2A)
+                case "GL3A":
+                    return str(GL3A)
+                case "GL4A":
+                    return str(GL4A)
+                case "GG":
+                    return str(self.current_student["grades"])
+                case _:
+                    return ("some error")
 
     def create_listen_socket(self):
         try:
