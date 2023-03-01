@@ -45,11 +45,19 @@ class Server:
 
     def __init__(self):
         self.students = []
+        self.GMA = 0
+        self.GEA = 0
+        self.GL1A = 0
+        self.GL2A = 0
+        self.GL3A = 0
+        self.GL4A = 0
+
         self.read_csv("course_grades_2023.csv")
         self.create_listen_socket()
         self.process_connections_forever()
 
     def read_csv(self, filename):
+
         with open(filename) as f:
             fields = f.readline()
             headers = fields.strip().split(',')
@@ -68,22 +76,55 @@ class Server:
             f.close()
         # Print the database
         print(self.students)
-        print("Data read from database:\n")
+        print("\n\nData read from database:\n")
         print(fields)
+
+        number_of_students = 0
+
         for line in lines:
             print(line, end='')
+            self.GMA += float(line.split(",")[7])
+            self.GEA += (float(line.split(",")[8]) + float(line.split(",")[9]) +
+                         float(line.split(",")[10]) + float(line.split(",")[11]))/4
+            self.GL1A += float(line.split(",")[3])
+            self.GL2A += float(line.split(",")[4])
+            self.GL3A += float(line.split(",")[5])
+            self.GL4A += float(line.split(",")[6])
+            number_of_students += 1
+
+        self.GMA /= number_of_students
+        self.GEA /= number_of_students
+        self.GL1A /= number_of_students
+        self.GL2A /= number_of_students
+        self.GL3A /= number_of_students
+        self.GL4A /= number_of_students
 
     def read_command(self, command):
         student_id = command.split(" ")[0]
+        current_command = command.split(" ")[1]
         self.current_student = next(
             (student for student in self.students if student['ID Number'] == student_id), None)
         if not self.current_student:
             print("User not found")
             return "User not found"
         else:
-            print("User found")
-            # TODO: Handle different commands
-            return str(self.current_student["grades"])
+            match current_command:
+                case "GMA":
+                    return str(self.GMA)
+                case "GEA":
+                    return str(self.GEA)
+                case "GL1A":
+                    return str(self.GL1A)
+                case "GL2A":
+                    return str(self.GL2A)
+                case "GL3A":
+                    return str(self.GL3A)
+                case "GL4A":
+                    return str(self.GL4A)
+                case "GG":
+                    return str(self.current_student["grades"])
+                case _:
+                    return ("some error")
 
     def create_listen_socket(self):
         try:
@@ -129,7 +170,7 @@ class Server:
 
                 response_str = self.read_command(recvd_str)
                 connection.sendall(self.encrypt_message(response_str))
-                print("Sent: ", response_str)
+                print(f"Sent: {response_str}\n")
 
             except KeyboardInterrupt:
                 print()
@@ -226,7 +267,7 @@ class Client:
                 sys.exit(1)
 
             recvd_msg = self.decrypt_message(recvd_bytes)
-            print("Received: ", recvd_msg)
+            print(f"Received: {recvd_msg}\n")
             if (recvd_msg == "User not found"):
                 self.student_id = ""
 
