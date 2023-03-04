@@ -94,6 +94,7 @@ class Server:
             print("User not found")
             return "User not found"
         else:
+            print(f"Received {current_command} command from client")
             match current_command:
                 case "GMA":
                     return f"Midterm Average = {str(self.GMA)}"
@@ -156,7 +157,6 @@ class Server:
                     break
 
                 recvd_str = recvd_bytes.decode(Server.MSG_ENCODING)
-                print("Received: ", recvd_str)
 
                 response_str = self.read_command(recvd_str)
                 connection.sendall(self.encrypt_message(response_str))
