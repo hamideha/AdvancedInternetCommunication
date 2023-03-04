@@ -14,30 +14,6 @@ GET_GRADES = "GG"
 RECV_BUFFER_SIZE = 1024
 FILENAME = "course_grades_2023.csv"
 
-# Client needs access to encryption keys so we just hardcode them 🤷🏼‍♂️
-ENCRYPTION_KEYS = {
-    "1803933": "M7E8erO15CIh902P8DQsHxKbOADTgEPGHdiY0MplTuY=",
-    "1884159": "PWMKkdXW4VJ3pXBpr9UwjefmlIxYwPzk11Aw9TQ2wZQ=",
-    "1853847": "UVpoR9emIZDrpQ6pCLYopzE2Qm8bCrVyGEzdOOo2wXw=",
-    "1810192": "bHdhydsHzwKdb0RF4wG72yGm2a2L-CNzDl7vaWOu9KA=",
-    "1891352": "iHsXoe_5Fle-PHGtgZUCs5ariPZT-LNCUYpixMC3NxI=",
-    "1811313": "IR_IQPnIM1TI8h4USnBLuUtC72cQ-u4Fwvlu3q5npA0=",
-    "1804841": "kE8FpmTv8d8sRPIswQjCMaqunLUGoRNW6OrYU9JWZ4w=",
-    "1881925": "_B__AgO34W7urog-thBu7mRKj3AY46D8L26yedUwf0I=",
-    "1877711": "dLOM7DyrEnUsW-Q7OM6LXxZsbCFhjmyhsVT3P7oADqk=",
-    "1830894": "aM4bOtearz2GpURUxYKW23t_DlljFLzbfgWS-IRMB3U=",
-    "1855191": "-IieSn1zKJ8P3XOjyAlRcD2KbeFl_BnQjHyCE7-356w=",
-    "1821012": "Lt5wWqTM1q9gNAgME4T5-5oVptAstg9llB4A_iNAYMY=",
-    "1844339": "M6glRgMP5Y8CZIs-MbyFvev5VKW-zbWyUMMt44QCzG4=",
-    "1898468": "SS0XtthxP64E-z4oB1IsdrzJwu1PUq6hgFqP_u435AA=",
-    "1883633": "0L_o75AEsOay_ggDJtOFWkgRpvFvM0snlDm9gep786I=",
-    "1808742": "9BXraBysqT7QZLBjegET0e52WklQ7BBYWXvv8xpbvr8=",
-    "1863450": "M0PgiJutAM_L9jvyfrGDWnbfJOXmhYt_skL0S88ngkU=",
-    "1830190": "v-5GfMaI2ozfmef5BNO5hI-fEGwtKjuI1XcuTDh-wsg=",
-    "1835544": "LI14DbKGBfJExlwLodr6fkV4Pv4eABWkEhzArPbPSR8=",
-    "1820930": "zoTviAO0EACFC4rFereJuc0A-99Xf_uOdq3GiqUpoeU=",
-}
-
 
 class Server:
     HOSTNAME = "0.0.0.0"
@@ -76,7 +52,6 @@ class Server:
                 self.students.append(student)
             f.close()
         # Print the database
-        print(self.students)
         print("\n\nData read from database:\n")
         print(fields)
 
@@ -121,19 +96,23 @@ class Server:
         else:
             match current_command:
                 case "GMA":
-                    return str(self.GMA)
+                    return f"Midterm Average = {str(self.GMA)}"
                 case "GEA":
-                    return str(self.GEA)
+                    return f"Exam Average = {str(self.GEA)}"
                 case "GL1A":
-                    return str(self.GL1A)
+                    return f"Lab 1 Average = {str(self.GL1A)}"
                 case "GL2A":
-                    return str(self.GL2A)
+                    return f"Lab 2 Average = {str(self.GL2A)}"
                 case "GL3A":
-                    return str(self.GL3A)
+                    return f"Lab 3 Average = {str(self.GL3A)}"
                 case "GL4A":
-                    return str(self.GL4A)
+                    return f"Lab 4 Average = {str(self.GL4A)}"
                 case "GG":
-                    return str(self.current_student["grades"])
+                    unpacked_dict = ""
+                    for key, value in self.current_student["grades"].items():
+                        unpacked_dict += f"\n{key} = {value}"
+                    return unpacked_dict
+                    # return str(self.current_student["grades"])
                 case _:
                     return "Unknown Command"
 
@@ -156,6 +135,7 @@ class Server:
             print(msg)
         except KeyboardInterrupt:
             print()
+            sys.exit(1)
         finally:
             self.socket.close()
             sys.exit(1)
@@ -168,7 +148,7 @@ class Server:
 
         while True:
             try:
-                recvd_bytes = connection.recv(Server.RECV_BUFFER_SIZE)
+                recvd_bytes = connection.recv(RECV_BUFFER_SIZE)
 
                 if len(recvd_bytes) == 0:
                     print("Closing client connection ... ")
@@ -200,9 +180,15 @@ class Client:
 
     def __init__(self):
         self.student_id = ""
+        self.encryption_keys = self.get_encryption_keys(FILENAME)
         self.get_socket()
         self.connect_to_server()
         self.send_console_input_forever()
+
+    def get_encryption_keys(self, filename):
+        with open(filename) as f:
+            lines = f.readlines()
+            return {line.split(",")[1]: line.split(",")[2] for line in lines[1:]}
 
     def get_socket(self):
         try:
@@ -267,7 +253,7 @@ class Client:
 
     def connection_receive(self):
         try:
-            recvd_bytes = self.socket.recv(Client.RECV_BUFFER_SIZE)
+            recvd_bytes = self.socket.recv(RECV_BUFFER_SIZE)
 
             if len(recvd_bytes) == 0:
                 print("Closing server connection ... ")
@@ -284,7 +270,7 @@ class Client:
             sys.exit(1)
 
     def decrypt_message(self, message):
-        key = ENCRYPTION_KEYS.get(self.student_id)
+        key = self.encryption_keys.get(self.student_id)
         if not key:
             return message.decode(Server.MSG_ENCODING)
         fernet = Fernet(key.encode(Server.MSG_ENCODING))
