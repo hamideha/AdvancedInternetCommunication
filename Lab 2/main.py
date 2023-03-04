@@ -11,6 +11,9 @@ GET_LAB_3_AVG = "GL3A"
 GET_LAB_4_AVG = "GL4A"
 GET_GRADES = "GG"
 
+RECV_BUFFER_SIZE = 1024
+FILENAME = "course_grades_2023.csv"
+
 # Client needs access to encryption keys so we just hardcode them 🤷🏼‍♂️
 ENCRYPTION_KEYS = {
     "1803933": "M7E8erO15CIh902P8DQsHxKbOADTgEPGHdiY0MplTuY=",
@@ -32,14 +35,13 @@ ENCRYPTION_KEYS = {
     "1863450": "M0PgiJutAM_L9jvyfrGDWnbfJOXmhYt_skL0S88ngkU=",
     "1830190": "v-5GfMaI2ozfmef5BNO5hI-fEGwtKjuI1XcuTDh-wsg=",
     "1835544": "LI14DbKGBfJExlwLodr6fkV4Pv4eABWkEhzArPbPSR8=",
-    "1820930": "zoTviAO0EACFC4rFereJuc0A-99Xf_uOdq3GiqUpoeU="
+    "1820930": "zoTviAO0EACFC4rFereJuc0A-99Xf_uOdq3GiqUpoeU=",
 }
 
 
 class Server:
     HOSTNAME = "0.0.0.0"
     PORT = 50000
-    RECV_BUFFER_SIZE = 1024
     MAX_CONNECTION_BACKLOG = 10
     MSG_ENCODING = "utf-8"
 
@@ -52,20 +54,19 @@ class Server:
         self.GL3A = 0
         self.GL4A = 0
 
-        self.read_csv("course_grades_2023.csv")
+        self.read_csv(FILENAME)
         self.create_listen_socket()
         self.process_connections_forever()
 
     def read_csv(self, filename):
-
         with open(filename) as f:
             fields = f.readline()
-            headers = fields.strip().split(',')
+            headers = fields.strip().split(",")
 
             lines = f.readlines()
             for line in lines:
                 student = {"grades": {}}
-                students_props = line.strip().split(',')
+                students_props = line.strip().split(",")
                 for i in range(len(students_props)):
                     if i < 3:
                         student[headers[i]] = students_props[i]
@@ -82,10 +83,14 @@ class Server:
         number_of_students = 0
 
         for line in lines:
-            print(line, end='')
+            print(line, end="")
             self.GMA += float(line.split(",")[7])
-            self.GEA += (float(line.split(",")[8]) + float(line.split(",")[9]) +
-                         float(line.split(",")[10]) + float(line.split(",")[11]))/4
+            self.GEA += (
+                float(line.split(",")[8])
+                + float(line.split(",")[9])
+                + float(line.split(",")[10])
+                + float(line.split(",")[11])
+            ) / 4
             self.GL1A += float(line.split(",")[3])
             self.GL2A += float(line.split(",")[4])
             self.GL3A += float(line.split(",")[5])
@@ -103,7 +108,13 @@ class Server:
         student_id = command.split(" ")[0]
         current_command = command.split(" ")[1]
         self.current_student = next(
-            (student for student in self.students if student['ID Number'] == student_id), None)
+            (
+                student
+                for student in self.students
+                if student["ID Number"] == student_id
+            ),
+            None,
+        )
         if not self.current_student:
             print("User not found")
             return "User not found"
@@ -124,7 +135,7 @@ class Server:
                 case "GG":
                     return str(self.current_student["grades"])
                 case _:
-                    return ("some error")
+                    return "Unknown Command"
 
     def create_listen_socket(self):
         try:
@@ -153,8 +164,7 @@ class Server:
         connection, address_port = client
         # Print the ip address and port of the client.
         print("-" * 72)
-        print(
-            f"Connection received from {address_port[0]} on port {address_port[1]}.")
+        print(f"Connection received from {address_port[0]} on port {address_port[1]}.")
 
         while True:
             try:
@@ -181,14 +191,12 @@ class Server:
     def encrypt_message(self, message):
         if not self.current_student:
             return message.encode(Server.MSG_ENCODING)
-        fernet = Fernet(
-            self.current_student["Key"].encode(Server.MSG_ENCODING))
+        fernet = Fernet(self.current_student["Key"].encode(Server.MSG_ENCODING))
         return fernet.encrypt(message.encode(Server.MSG_ENCODING))
 
 
 class Client:
     SERVER_HOSTNAME = socket.gethostname()
-    RECV_BUFFER_SIZE = 1024
 
     def __init__(self):
         self.student_id = ""
@@ -268,7 +276,7 @@ class Client:
 
             recvd_msg = self.decrypt_message(recvd_bytes)
             print(f"Received: {recvd_msg}\n")
-            if (recvd_msg == "User not found"):
+            if recvd_msg == "User not found":
                 self.student_id = ""
 
         except Exception as msg:
@@ -283,15 +291,18 @@ class Client:
         return fernet.decrypt(message).decode(Server.MSG_ENCODING)
 
 
-if __name__ == '__main__':
-    roles = {'client': Client, 'server': Server}
+if __name__ == "__main__":
+    roles = {"client": Client, "server": Server}
     parser = ArgumentParser()
 
-    parser.add_argument('-r', '--role',
-                        choices=roles,
-                        help='server or client role',
-                        required=True,
-                        type=str)
+    parser.add_argument(
+        "-r",
+        "--role",
+        choices=roles,
+        help="server or client role",
+        required=True,
+        type=str,
+    )
 
     args = parser.parse_args()
     roles[args.role]()
