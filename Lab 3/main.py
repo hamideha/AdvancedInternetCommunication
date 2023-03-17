@@ -17,6 +17,7 @@ CMD = {
     "get": b"\x01",
     "put": b"\x02",
     "list": b"\x03",
+    "bye": b"\x04",
 }
 
 
@@ -100,7 +101,9 @@ class Server:
             self.socket.close()
 
     def process_discovery_connections_forever(self):
-        print(f"Listening for service discovery messages on SDP port {Server.SERVICE_DISCOVERY_PORT}")
+        print(
+            f"Listening for service discovery messages on SDP port {Server.SERVICE_DISCOVERY_PORT}"
+        )
         while True:
             try:
                 recvd_bytes, address = self.discovery_socket.recvfrom(RECV_SIZE)
@@ -120,11 +123,70 @@ class Server:
         print(f"Connection received from {address[0]} on port {address[1]}.")
 
         cmd = int.from_bytes(connection.recv(CMD_FIELD_LEN), byteorder="big")
+        if cmd == CMD["get"]:
+            filename_bytes = connection.recv(RECV_SIZE)
+            filename = filename_bytes.decode(MSG_ENCODING)
+
+            try:
+                file = open(filename, "rb").read()
+            except FileNotFoundError:
+                print(Server.FILE_NOT_FOUND_MSG)
+                return
+
+            file_size_bytes = len(file)
+
+            file_size_field = file_size_bytes.to_bytes(
+                FILESIZE_FIELD_LEN, byteorder="big"
+            )
+
+            pkt = file_size_field + file
+
+            connection.sendall(pkt)
+            print(f"Sending {filename}")
+
+        if cmd == CMD["put"]:
+            filename_len_bytes = connection.recv(FILENAME_SIZE_FIELD_LEN)
+            filename_len = int.from_bytes(filename_len_bytes, byteorder='big')
+
+            filename_bytes = connection.recv(filename_len)
+            filename = filename_bytes.decode(MSG_ENCODING)
+
+            file_size_bytes = connection.recv(FILESIZE_FIELD_LEN)
+            file_size = int.from_bytes(file_size_bytes, byteorder='big')
+            
+            byte_recv_count = 0
+            recv_bytes = b''
+
+            try:
+                while byte_recv_count < file_size:
+                    new_bytes = connection.recv(RECV_SIZE)
+
+                    if not new_bytes:
+                        return
+                    byte_recv_count += len(new_bytes)
+                    recv_bytes += new_bytes
+                print(f"Received {len(recv_bytes)} bytes")
+                try:
+                    file = open(filename, 'wb+')
+                    file.write(recv_bytes)
+                    file.close()
+                except FileNotFoundError:
+                    print(Server.FILE_NOT_FOUND_MSG)
+                    file.close()
+            except KeyboardInterrupt:
+                os.remove("./", file)
+                sys.exit(1)
+
         if cmd == CMD["list"]:
             listdir_bytes = str(os.listdir()).encode(MSG_ENCODING)
 
             connection.sendall(listdir_bytes)
             print("Sending ls...")
+
+        if cmd == CMD["bye"]:
+            print("Closing client connection ...")
+            connection.close()
+            sys.exit(1)
 
 
 class Client:
@@ -201,7 +263,6 @@ class Client:
             print("Successfully connected to service")
         except Exception as msg:
             print(msg)
-
 
 
 if __name__ == "__main__":
