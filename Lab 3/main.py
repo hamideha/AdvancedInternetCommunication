@@ -180,6 +180,10 @@ class Server:
                 os.remove("./", file)
                 sys.exit(1)
 
+        if cmd == CMD["rlist"]:
+            
+            pass
+
         if cmd == CMD["list"]:
             listdir_bytes = str(os.listdir()).encode(MSG_ENCODING)
 
@@ -197,12 +201,14 @@ class Client:
     SERVICE_DISCOVERY_PORT = 30000
     ADDRESS_PORT = (BROADCAST_ADDRESS, SERVICE_DISCOVERY_PORT)
 
-    DIR = "client"
+    # DIR = "./client" # TODO confirm
+    SERVER_ADDRESS = "0.0.0.0"
+    SERVER_PORT = 30001
 
     TOTAL_SCANS = 3
 
     def __init__(self):
-        os.chdir(Client.DIR)
+        # os.chdir(Client.DIR) TODO confirm
         self.create_broadcast_socket()
         self.get_console_input()
 
