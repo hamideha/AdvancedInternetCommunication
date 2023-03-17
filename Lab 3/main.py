@@ -202,6 +202,9 @@ class Client:
     SERVER_ADDRESS = "0.0.0.0"
     SERVER_PORT = 30001
 
+    SERVER_ADDRESS = "0.0.0.0"
+    SERVER_PORT = 30001
+
     TOTAL_SCANS = 3
 
     def __init__(self):
