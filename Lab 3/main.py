@@ -212,6 +212,9 @@ class Client:
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.broadcast_socket.settimeout(SOCKET_TIMEOUT)
+            self.file_transfer_socket = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM
+            )
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -222,11 +225,37 @@ class Client:
             if self.input_text != "":
                 print("Command Entered: ", self.input_text)
                 if self.input_text == "scan":
+                    print("Scanning...")
                     self.scan()
-                elif self.input_text == "connect":
-                    self.connect_to_server()
+                elif self.input_text.split[0] == "connect":
+                    self.connect_to_server((self.input_text[1], self.input_text[2]))
+                elif (
+                    self.input_text == "llist"
+                ):  # TODO print local client directory structure
+                    print("Local List. Fetching local directory structure:")
+                    pass
+                elif (
+                    self.input_text == "rlist"
+                ):  # TODO print server directory structure
+                    print()
+                    pass
+                elif (
+                    self.input_text.split()[0] == "put"
+                ):  # TODO take filename and send that file to server
+                    print()
+                    pass
+                elif (
+                    self.input_text.split()[0] == "get"
+                ):  # TODO take filename and fetch from server
+                    print()
+                    pass
+                elif self.input_text == "bye":
+                    print("Terminating connection. Goodbye!")
+                    self.file_transfer_socket.close()
                 else:
-                    print("Invalid command")
+                    print(
+                        "Invalid command. Please input one of the following commands in the specified structure:"
+                    )
                     continue
                 break
 
@@ -261,10 +290,10 @@ class Client:
         else:
             print("No services found.")
 
-    def connect_to_server(self):
+    def connect_to_server(self, server_address):
         try:
-            tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # TODO: Parse the address and port from the user
+            # tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.file_transfer_socket.connect(server_address)
             # tcp_socket.connect((Server.HOSTNAME, Server.PORT))
             print("Successfully connected to service")
         except Exception as msg:
