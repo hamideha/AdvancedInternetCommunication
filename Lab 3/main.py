@@ -20,6 +20,8 @@ CMD = {
     "bye": b"\x04",
 }
 
+FILE_NOT_FOUND_MSG = "Error: Requested file is not available!"
+
 
 def recv_bytes(sock, bytecount_target):
     # Be sure to timeout the socket if we are given the wrong
@@ -55,10 +57,10 @@ class Server:
     BACKLOG = 5
 
     SERVICE_NAME = "Abdulrahman, Faizan and Khaled's File Sharing Service"
-
-    FILE_NOT_FOUND_MSG = "Error: Requested file is not available!"
+    DIR = "server"
 
     def __init__(self):
+        os.chdir(Server.DIR)
         self.create_listen_socket()
         self.create_discovery_socket()
 
@@ -89,13 +91,18 @@ class Server:
             sys.exit(1)
 
     def process_connections_forever(self):
+        connection, address = self.socket.accept()
+
         try:
+            print("-" * 72)
+            print(f"Connection received from {address[0]} on port {address[1]}.")
             while True:
-                self.connection_handler(self.socket.accept())
+                self.connection_handler(connection)
         except Exception as msg:
             print(msg)
         except KeyboardInterrupt:
-            print()
+            print("Closing client connection ...")
+            connection.close()
             sys.exit(1)
         finally:
             self.socket.close()
@@ -117,12 +124,8 @@ class Server:
                 print()
                 sys.exit(1)
 
-    def connection_handler(self, client):
-        connection, address = client
-        print("-" * 72)
-        print(f"Connection received from {address[0]} on port {address[1]}.")
-
-        cmd = int.from_bytes(connection.recv(CMD_FIELD_LEN), byteorder="big")
+    def connection_handler(self, connection):
+        cmd = connection.recv(CMD_FIELD_LEN)
         if cmd == CMD["get"]:
             filename_bytes = connection.recv(RECV_SIZE)
             filename = filename_bytes.decode(MSG_ENCODING)
@@ -130,7 +133,7 @@ class Server:
             try:
                 file = open(filename, "rb").read()
             except FileNotFoundError:
-                print(Server.FILE_NOT_FOUND_MSG)
+                print(FILE_NOT_FOUND_MSG)
                 return
 
             file_size_bytes = len(file)
@@ -146,16 +149,16 @@ class Server:
 
         if cmd == CMD["put"]:
             filename_len_bytes = connection.recv(FILENAME_SIZE_FIELD_LEN)
-            filename_len = int.from_bytes(filename_len_bytes, byteorder='big')
+            filename_len = int.from_bytes(filename_len_bytes, byteorder="big")
 
             filename_bytes = connection.recv(filename_len)
             filename = filename_bytes.decode(MSG_ENCODING)
 
             file_size_bytes = connection.recv(FILESIZE_FIELD_LEN)
-            file_size = int.from_bytes(file_size_bytes, byteorder='big')
-            
+            file_size = int.from_bytes(file_size_bytes, byteorder="big")
+
             byte_recv_count = 0
-            recv_bytes = b''
+            recv_bytes = b""
 
             try:
                 while byte_recv_count < file_size:
@@ -167,11 +170,11 @@ class Server:
                     recv_bytes += new_bytes
                 print(f"Received {len(recv_bytes)} bytes")
                 try:
-                    file = open(filename, 'wb+')
+                    file = open(filename, "wb+")
                     file.write(recv_bytes)
                     file.close()
                 except FileNotFoundError:
-                    print(Server.FILE_NOT_FOUND_MSG)
+                    print(FILE_NOT_FOUND_MSG)
                     file.close()
             except KeyboardInterrupt:
                 os.remove("./", file)
@@ -194,9 +197,12 @@ class Client:
     SERVICE_DISCOVERY_PORT = 30000
     ADDRESS_PORT = (BROADCAST_ADDRESS, SERVICE_DISCOVERY_PORT)
 
+    DIR = "client"
+
     TOTAL_SCANS = 3
 
     def __init__(self):
+        os.chdir(Client.DIR)
         self.create_broadcast_socket()
         self.get_console_input()
 
