@@ -7,7 +7,7 @@ import os
 CMD_FIELD_LEN = 1
 FILENAME_SIZE_FIELD_LEN = 1
 FILESIZE_FIELD_LEN = 8
-SOCKET_TIMEOUT = 4
+SOCKET_TIMEOUT = 2
 
 MSG_ENCODING = "utf-8"
 RECV_SIZE = 1024
@@ -21,33 +21,6 @@ CMD = {
 }
 
 FILE_NOT_FOUND_MSG = "Error: Requested file is not available!"
-
-
-def recv_bytes(sock, bytecount_target):
-    # Be sure to timeout the socket if we are given the wrong
-    # information.
-    sock.settimeout(SOCKET_TIMEOUT)
-    try:
-        byte_recv_count = 0  # total received bytes
-        recv_bytes = b""  # complete received message
-        while byte_recv_count < bytecount_target:
-            # Ask the socket for the remaining byte count.
-            new_bytes = sock.recv(bytecount_target - byte_recv_count)
-            # If ever the other end closes on us before we are done,
-            # give up and return a False status with zero bytes.
-            if not new_bytes:
-                return (False, b"")
-            byte_recv_count += len(new_bytes)
-            recv_bytes += new_bytes
-        # Turn off the socket timeout if we finish correctly.
-        sock.settimeout(None)
-        return (True, recv_bytes)
-    # If the socket times out, something went wrong. Return a False
-    # status.
-    except socket.timeout:
-        sock.settimeout(None)
-        print("recv_bytes: Recv socket timeout!")
-        return (False, b"")
 
 
 class Server:
@@ -67,8 +40,7 @@ class Server:
         udp_thread = threading.Thread(target=self.process_discovery_connections_forever)
         udp_thread.start()
 
-        tcp_thread = threading.Thread(target=self.process_connections_forever)
-        tcp_thread.start()
+        self.get_tcp_connection()
 
     def create_listen_socket(self):
         try:
@@ -90,12 +62,18 @@ class Server:
             print(msg)
             sys.exit(1)
 
-    def process_connections_forever(self):
-        connection, address = self.socket.accept()
+    def get_tcp_connection(self):
+        while True:
+            client = self.socket.accept()
+            tcp_thread = threading.Thread(target = self.process_connections_forever, args=(client,))
+            tcp_thread.start()
 
+    def process_connections_forever(self, client):
+        connection, address = client
+
+        print("-" * 72)
+        print(f"Connection received from {address[0]} on port {address[1]}.")
         try:
-            print("-" * 72)
-            print(f"Connection received from {address[0]} on port {address[1]}.")
             while True:
                 self.connection_handler(connection)
         except Exception as msg:
@@ -104,8 +82,6 @@ class Server:
             print("Closing client connection ...")
             connection.close()
             sys.exit(1)
-        finally:
-            self.socket.close()
 
     def process_discovery_connections_forever(self):
         print(
@@ -162,7 +138,9 @@ class Server:
 
             try:
                 while byte_recv_count < file_size:
-                    new_bytes = connection.recv(RECV_SIZE)
+                    new_bytes = connection.recv(
+                        min(RECV_SIZE, file_size - byte_recv_count)
+                    )
 
                     if not new_bytes:
                         return
@@ -196,7 +174,6 @@ class Client:
     BROADCAST_ADDRESS = "255.255.255.255"
     SERVICE_DISCOVERY_PORT = 30000
     ADDRESS_PORT = (BROADCAST_ADDRESS, SERVICE_DISCOVERY_PORT)
-    # CLIENT_DIR = "./client/"
 
     DIR = "client"
 
@@ -205,6 +182,7 @@ class Client:
     def __init__(self):
         os.chdir(Client.DIR)
         self.create_broadcast_socket()
+        self.create_tcp_socket()
         self.get_console_input()
 
     def create_broadcast_socket(self):
@@ -213,6 +191,12 @@ class Client:
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.broadcast_socket.settimeout(SOCKET_TIMEOUT)
+        except Exception as msg:
+            print(msg)
+            sys.exit(1)
+
+    def create_tcp_socket(self):
+        try:
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except Exception as msg:
             print(msg)
@@ -220,52 +204,58 @@ class Client:
 
     def get_console_input(self):
         while True:
-            self.input_text = input("Command: ")
-            if self.input_text != "":
-                print("Command Entered: ", self.input_text)
-                if self.input_text == "scan":
-                    print("Scanning...")
-                    self.scan()
-                elif self.input_text.split()[0] == "connect":
-                    self.connect_to_server(
-                        (self.input_text.split()[1], int(self.input_text.split()[2]))
-                    )  # use port 30,001 for now
-                elif self.input_text == "llist":
-                    print("Local List. Fetching local directory structure:")
-                    print(os.listdir())
-                elif self.input_text == "rlist":
-                    self.tcp_socket.sendall(CMD["list"])
-                    rlist_bytes = self.tcp_socket.recv(RECV_SIZE)
-                    rlist = rlist_bytes.decode(MSG_ENCODING)
-                    print(rlist)
-                elif self.input_text.split()[0] == "put":
-                    print(f"Uploading {self.input_text.split()[1]} to server...\n")
-                    self.put_file(self.input_text.split()[1])
-                    print("Upload Complete!\n")
-
-                elif self.input_text.split()[0] == "get":
-                    print(f"Downloading {self.input_text.split()[1]} from server...\n")
-                    self.get_file(self.input_text.split()[1])
-                    print("Download Complete!\n")
-
-                elif self.input_text == "bye":
-                    print("Terminating connection. Goodbye!")
-                    # self.tcp_socket.sendall(CMD["bye"])
-                    self.tcp_socket.close()
-                    # break
-                else:
-                    print(
-                        """
-                        Invalid command. Please input one of the following commands in the specified structure:
-                        - 'scan' to scan for available File Sharing Services.
-                        - 'connect <IP Address> <Port>' to connect to the server at the specified address.
-                        - 'llist'
-                        - 'rlist'
-                        - 'put <file name>'
-                        - 'get <file name>'
-                        - 'bye' to close the connection
-                        """
-                    )
+            try:
+                self.input_text = input("\nCommand: ")
+                if self.input_text != "":
+                    print("Command Entered: ", self.input_text)
+                    if self.input_text == "scan":
+                        print("Scanning...")
+                        self.scan()
+                    elif self.input_text.split()[0] == "connect":
+                        self.connect_to_server(
+                            (
+                                self.input_text.split()[1],
+                                int(self.input_text.split()[2]),
+                            )
+                        )
+                    elif self.input_text == "llist":
+                        print("Local List. Fetching local directory structure:")
+                        print(os.listdir())
+                    elif self.input_text == "rlist":
+                        self.tcp_socket.sendall(CMD["list"])
+                        rlist_bytes = self.tcp_socket.recv(RECV_SIZE)
+                        rlist = rlist_bytes.decode(MSG_ENCODING)
+                        print(rlist)
+                    elif self.input_text.split()[0] == "put":
+                        print(f"Uploading {self.input_text.split()[1]} to server...")
+                        self.put_file(self.input_text.split()[1])
+                        print("Upload Complete!")
+                    elif self.input_text.split()[0] == "get":
+                        print(
+                            f"Downloading {self.input_text.split()[1]} from server..."
+                        )
+                        self.get_file(self.input_text.split()[1])
+                    elif self.input_text == "bye":
+                        print("Terminating connection. Goodbye!")
+                        self.tcp_socket.sendall(CMD["bye"])
+                        self.tcp_socket.close()
+                        self.create_tcp_socket()
+                    else:
+                        print(
+                            """
+                            Invalid command. Please input one of the following commands in the specified structure:
+                            - 'scan' to scan for available File Sharing Services.
+                            - 'connect <IP Address> <Port>' to connect to the server at the specified address.
+                            - 'llist'
+                            - 'rlist'
+                            - 'put <file name>'
+                            - 'get <file name>'
+                            - 'bye' to close the connection
+                            """
+                        )
+            except Exception as msg:
+                print(msg)
+                continue
 
     def put_file(self, file_name):
         try:
@@ -294,34 +284,34 @@ class Client:
         self.tcp_socket.sendall(CMD["get"])
         self.tcp_socket.sendall(filename.encode(MSG_ENCODING))
 
-        file_size_field = recv_bytes(self.tcp_socket, FILESIZE_FIELD_LEN)[1]
+        file_size_field = self.tcp_socket.recv(FILESIZE_FIELD_LEN)
         file_size = int.from_bytes(file_size_field, byteorder="big")
 
-        recv_count = 0
+        byte_recv_count = 0
         rec_bytes = b""
 
-        while recv_count < file_size:
-            bytes = recv_bytes(self.tcp_socket, min(RECV_SIZE, file_size - recv_count))[
-                1
-            ]
-            if not bytes:
+        while byte_recv_count < file_size:
+            new_bytes = self.tcp_socket.recv(
+                min(RECV_SIZE, file_size - byte_recv_count)
+            )
+            if not new_bytes:
                 break
-            recv_count += len(bytes)
-            rec_bytes += bytes
+            byte_recv_count += len(new_bytes)
+            rec_bytes += new_bytes
 
-        if recv_count != file_size:
-            print(f"Error")
+        if byte_recv_count != file_size:
+            print(f"Unable to download file {filename}")
         else:
             with open(filename, "wb") as f:
                 f.write(rec_bytes)
-            print(f"Success")
+            print("Download Complete!")
         return
 
     def scan(self):
         scan_results = []
         try:
             for i in range(Client.TOTAL_SCANS):
-                print(f"Sending broadcast scan {i}")
+                print(f"Sending scan {i}")
                 self.broadcast_socket.sendto(
                     BROADCAST_CMD.encode(MSG_ENCODING), Client.ADDRESS_PORT
                 )
@@ -333,7 +323,6 @@ class Client:
 
                         if (recvd_msg, address) not in scan_results:
                             scan_results.append((recvd_msg, address))
-                            continue
 
                     except socket.timeout:
                         break
