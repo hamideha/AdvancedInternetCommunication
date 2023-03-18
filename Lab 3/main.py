@@ -64,8 +64,7 @@ class Server:
         self.create_listen_socket()
         self.create_discovery_socket()
 
-        udp_thread = threading.Thread(
-            target=self.process_discovery_connections_forever)
+        udp_thread = threading.Thread(target=self.process_discovery_connections_forever)
         udp_thread.start()
 
         tcp_thread = threading.Thread(target=self.process_connections_forever)
@@ -77,20 +76,16 @@ class Server:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind((Server.HOSTNAME, Server.PORT))
             self.socket.listen(Server.BACKLOG)
-            print(
-                f"Listening for file sharing connections on port {Server.PORT} ...")
+            print(f"Listening for file sharing connections on port {Server.PORT} ...")
         except Exception as msg:
             print(msg)
             sys.exit(1)
 
     def create_discovery_socket(self):
         try:
-            self.discovery_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_DGRAM)
-            self.discovery_socket.setsockopt(
-                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.discovery_socket.bind(
-                (Server.HOSTNAME, Server.SERVICE_DISCOVERY_PORT))
+            self.discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.discovery_socket.bind((Server.HOSTNAME, Server.SERVICE_DISCOVERY_PORT))
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -100,8 +95,7 @@ class Server:
 
         try:
             print("-" * 72)
-            print(
-                f"Connection received from {address[0]} on port {address[1]}.")
+            print(f"Connection received from {address[0]} on port {address[1]}.")
             while True:
                 self.connection_handler(connection)
         except Exception as msg:
@@ -119,8 +113,7 @@ class Server:
         )
         while True:
             try:
-                recvd_bytes, address = self.discovery_socket.recvfrom(
-                    RECV_SIZE)
+                recvd_bytes, address = self.discovery_socket.recvfrom(RECV_SIZE)
                 recvd_str = recvd_bytes.decode(MSG_ENCODING)
 
                 if BROADCAST_CMD in recvd_str:
@@ -206,11 +199,6 @@ class Client:
     # CLIENT_DIR = "./client/"
 
     DIR = "client"
-    SERVER_ADDRESS = "0.0.0.0"
-    SERVER_PORT = 30001
-
-    SERVER_ADDRESS = "0.0.0.0"
-    SERVER_PORT = 30001
 
     TOTAL_SCANS = 3
 
@@ -221,12 +209,9 @@ class Client:
 
     def create_broadcast_socket(self):
         try:
-            self.broadcast_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_DGRAM)
-            self.broadcast_socket.setsockopt(
-                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.broadcast_socket.setsockopt(
-                socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            self.broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.broadcast_socket.settimeout(SOCKET_TIMEOUT)
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except Exception as msg:
@@ -243,8 +228,7 @@ class Client:
                     self.scan()
                 elif self.input_text.split()[0] == "connect":
                     self.connect_to_server(
-                        (self.input_text.split()[1], int(
-                            self.input_text.split()[2]))
+                        (self.input_text.split()[1], int(self.input_text.split()[2]))
                     )  # use port 30,001 for now
                 elif self.input_text == "llist":
                     print("Local List. Fetching local directory structure:")
@@ -255,14 +239,12 @@ class Client:
                     rlist = rlist_bytes.decode(MSG_ENCODING)
                     print(rlist)
                 elif self.input_text.split()[0] == "put":
-                    print(
-                        f"Uploading {self.input_text.split()[1]} to server...\n")
+                    print(f"Uploading {self.input_text.split()[1]} to server...\n")
                     self.put_file(self.input_text.split()[1])
                     print("Upload Complete!\n")
 
                 elif self.input_text.split()[0] == "get":
-                    print(
-                        f"Downloading {self.input_text.split()[1]} from server...\n")
+                    print(f"Downloading {self.input_text.split()[1]} from server...\n")
                     self.get_file(self.input_text.split()[1])
                     print("Download Complete!\n")
 
@@ -298,11 +280,9 @@ class Client:
             FILENAME_SIZE_FIELD_LEN, byteorder="big"
         )
         file_size_bytes = len(file)
-        file_size = file_size_bytes.to_bytes(
-            FILESIZE_FIELD_LEN, byteorder="big")
+        file_size = file_size_bytes.to_bytes(FILESIZE_FIELD_LEN, byteorder="big")
 
-        pkt = CMD["put"] + filename_len_bytes + \
-            filename_bytes + file_size + file
+        pkt = CMD["put"] + filename_len_bytes + filename_bytes + file_size + file
 
         try:
             self.tcp_socket.sendall(pkt)
@@ -348,8 +328,7 @@ class Client:
 
                 while True:
                     try:
-                        recvd_bytes, address = self.broadcast_socket.recvfrom(
-                            RECV_SIZE)
+                        recvd_bytes, address = self.broadcast_socket.recvfrom(RECV_SIZE)
                         recvd_msg = recvd_bytes.decode(MSG_ENCODING)
 
                         if (recvd_msg, address) not in scan_results:
