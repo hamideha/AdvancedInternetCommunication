@@ -200,6 +200,7 @@ class Client:
     BROADCAST_ADDRESS = "255.255.255.255"
     SERVICE_DISCOVERY_PORT = 30000
     ADDRESS_PORT = (BROADCAST_ADDRESS, SERVICE_DISCOVERY_PORT)
+    CLIENT_DIR = "./client/"
 
     # DIR = "./client" # TODO confirm
     SERVER_ADDRESS = "0.0.0.0"
@@ -233,13 +234,12 @@ class Client:
                 if self.input_text == "scan":
                     print("Scanning...")
                     self.scan()
-                elif self.input_text.split[0] == "connect":
-                    self.connect_to_server((self.input_text[1], self.input_text[2]))
-                elif (
-                    self.input_text == "llist"
-                ):  # TODO print local client directory structure
+                elif self.input_text.split()[0] == "connect":
+                    self.connect_to_server((self.input_text.split()[1], self.input_text.split()[2]))
+                elif self.input_text == "llist":
                     print("Local List. Fetching local directory structure:")
-                    pass
+                    print(os.listdir(self.CLIENT_DIR))
+                    continue
                 elif (
                     self.input_text == "rlist"
                 ):  # TODO print server directory structure
