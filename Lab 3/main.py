@@ -78,6 +78,8 @@ class Server:
                 self.connection_handler(connection)
         except Exception as msg:
             print(msg)
+            connection.close()
+            sys.exit(1)
         except KeyboardInterrupt:
             print("Closing client connection ...")
             connection.close()
@@ -154,7 +156,7 @@ class Server:
                 except FileNotFoundError:
                     print(FILE_NOT_FOUND_MSG)
                     file.close()
-            except KeyboardInterrupt:
+            except:
                 os.remove("./", file)
                 sys.exit(1)
 
@@ -229,7 +231,6 @@ class Client:
                     elif self.input_text.split()[0] == "put":
                         print(f"Uploading {self.input_text.split()[1]} to server...")
                         self.put_file(self.input_text.split()[1])
-                        print("Upload Complete!")
                     elif self.input_text.split()[0] == "get":
                         print(
                             f"Downloading {self.input_text.split()[1]} from server..."
@@ -255,6 +256,8 @@ class Client:
                         )
             except Exception as msg:
                 print(msg)
+                self.tcp_socket.close()
+                self.create_tcp_socket()
                 continue
 
     def put_file(self, file_name):
@@ -276,7 +279,6 @@ class Client:
 
         try:
             self.tcp_socket.sendall(pkt)
-            print(f"Sending {file_name}")
         except:
             return
 
