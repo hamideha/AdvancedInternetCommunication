@@ -180,10 +180,6 @@ class Server:
                 os.remove("./", file)
                 sys.exit(1)
 
-        if cmd == CMD["rlist"]:
-            
-            pass
-
         if cmd == CMD["list"]:
             listdir_bytes = str(os.listdir()).encode(MSG_ENCODING)
 
@@ -200,16 +196,16 @@ class Client:
     BROADCAST_ADDRESS = "255.255.255.255"
     SERVICE_DISCOVERY_PORT = 30000
     ADDRESS_PORT = (BROADCAST_ADDRESS, SERVICE_DISCOVERY_PORT)
-    CLIENT_DIR = "./client/"
+    # CLIENT_DIR = "./client/"
 
-    # DIR = "./client" # TODO confirm
+    DIR = "client"
     SERVER_ADDRESS = "0.0.0.0"
     SERVER_PORT = 30001
 
     TOTAL_SCANS = 3
 
     def __init__(self):
-        # os.chdir(Client.DIR) TODO confirm
+        os.chdir(Client.DIR)
         self.create_broadcast_socket()
         self.get_console_input()
 
@@ -219,9 +215,7 @@ class Client:
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.broadcast_socket.settimeout(SOCKET_TIMEOUT)
-            self.file_transfer_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM
-            )
+            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -235,39 +229,96 @@ class Client:
                     print("Scanning...")
                     self.scan()
                 elif self.input_text.split()[0] == "connect":
-                    self.connect_to_server((self.input_text.split()[1], self.input_text.split()[2]))
+                    self.connect_to_server(
+                        (self.input_text.split()[1], int(self.input_text.split()[2]))
+                    )  # use port 30,001 for now
                 elif self.input_text == "llist":
                     print("Local List. Fetching local directory structure:")
-                    print(os.listdir(self.CLIENT_DIR))
-                    continue
-                elif (
-                    self.input_text == "rlist"
-                ):  # TODO print server directory structure
-                    print()
-                    pass
-                elif (
-                    self.input_text.split()[0] == "put"
-                ):  # TODO take filename and send that file to server
-                    print()
-                    pass
-                elif (
-                    self.input_text.split()[0] == "get"
-                ):  # TODO take filename and fetch from server
-                    print()
-                    pass
+                    print(os.listdir())
+                elif self.input_text == "rlist":
+                    self.tcp_socket.sendall(CMD["list"])
+                    rlist_bytes = self.tcp_socket.recv(RECV_SIZE)
+                    rlist = rlist_bytes.decode(MSG_ENCODING)
+                    print(rlist)
+                elif self.input_text.split()[0] == "put":
+                    print(f"Uploading {self.input_text.split()[1]} to server...\n")
+                    self.put_file(self.input_text.split()[1])
+                    print("Upload Complete!\n")
+
+                elif self.input_text.split()[0] == "get":
+                    print(f"Downloading {self.input_text.split()[1]} from server...\n")
+                    self.get_file(self.input_text.split()[1])
+                    print("Download Complete!\n")
+
                 elif self.input_text == "bye":
                     print("Terminating connection. Goodbye!")
-                    self.file_transfer_socket.close()
+                    self.tcp_socket.close()
                 else:
                     print(
-                        "Invalid command. Please input one of the following commands in the specified structure:"
+                        """
+                        Invalid command. Please input one of the following commands in the specified structure:
+                        - 'scan' to scan for available File Sharing Services.
+                        - 'connect <IP Address> <Port>' to connect to the server at the specified address.
+                        - 'llist'
+                        - 'rlist'
+                        - 'put <file name>'
+                        - 'get <file name>'
+                        - 'bye' to close the connection
+                        """
                     )
-                    continue
+
+    def put_file(self, file_name):
+        try:
+            file = open(file_name, "rb").read()
+        except FileNotFoundError:
+            print(FILE_NOT_FOUND_MSG)
+            return
+
+        filename_bytes = file_name.encode(MSG_ENCODING)
+        filename_len = len(filename_bytes)
+        filename_len_bytes = filename_len.to_bytes(
+            FILENAME_SIZE_FIELD_LEN, byteorder="big"
+        )
+        file_size_bytes = len(file)
+        file_size = file_size_bytes.to_bytes(FILESIZE_FIELD_LEN, byteorder="big")
+
+        pkt = CMD["put"] + filename_len_bytes + filename_bytes + file_size + file
+
+        try:
+            self.tcp_socket.sendall(pkt)
+            print(f"Sending {file_name}")
+        except:
+            return
+
+    def get_file(self, filename):
+        self.tcp_socket.sendall(CMD["get"])
+        self.tcp_socket.sendall(filename.encode(MSG_ENCODING))
+
+        file_size_field = recv_bytes(self.tcp_socket, FILESIZE_FIELD_LEN)[1]
+        file_size = int.from_bytes(file_size_field, byteorder="big")
+
+        recv_count = 0
+        rec_bytes = b""
+
+        while recv_count < file_size:
+            bytes = recv_bytes(self.tcp_socket, min(RECV_SIZE, file_size - recv_count))[
+                1
+            ]
+            if not bytes:
                 break
+            recv_count += len(bytes)
+            rec_bytes += bytes
+
+        if recv_count != file_size:
+            print(f"Error")
+        else:
+            with open(filename, "wb") as f:
+                f.write(rec_bytes)
+            print(f"Success")
+        return
 
     def scan(self):
         scan_results = []
-
         try:
             for i in range(Client.TOTAL_SCANS):
                 print(f"Sending broadcast scan {i}")
@@ -298,9 +349,7 @@ class Client:
 
     def connect_to_server(self, server_address):
         try:
-            # tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.file_transfer_socket.connect(server_address)
-            # tcp_socket.connect((Server.HOSTNAME, Server.PORT))
+            self.tcp_socket.connect(server_address)
             print("Successfully connected to service")
         except Exception as msg:
             print(msg)
