@@ -268,9 +268,9 @@ class Client:
 
                 elif self.input_text == "bye":
                     print("Terminating connection. Goodbye!")
-                    self.tcp_socket.sendall(CMD["bye"])
+                    # self.tcp_socket.sendall(CMD["bye"])
                     self.tcp_socket.close()
-                    break
+                    # break
                 else:
                     print(
                         """
