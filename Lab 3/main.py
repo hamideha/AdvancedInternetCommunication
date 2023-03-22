@@ -36,6 +36,10 @@ class Server:
         os.chdir(Server.DIR)
         self.create_listen_socket()
         self.create_discovery_socket()
+        print("Directory contents: \n")
+        for file in os.listdir():
+            print(file)
+        print("\n")
 
         udp_thread = threading.Thread(target=self.process_discovery_connections_forever)
         udp_thread.start()
