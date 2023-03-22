@@ -34,12 +34,13 @@ class Server:
 
     def __init__(self):
         os.chdir(Server.DIR)
-        self.create_listen_socket()
-        self.create_discovery_socket()
         print("Directory contents: \n")
         for file in os.listdir():
             print(file)
         print("\n")
+
+        self.create_listen_socket()
+        self.create_discovery_socket()
 
         udp_thread = threading.Thread(target=self.process_discovery_connections_forever)
         udp_thread.start()
@@ -69,7 +70,9 @@ class Server:
     def get_tcp_connection(self):
         while True:
             client = self.socket.accept()
-            tcp_thread = threading.Thread(target = self.process_connections_forever, args=(client,))
+            tcp_thread = threading.Thread(
+                target=self.process_connections_forever, args=(client,)
+            )
             tcp_thread.start()
 
     def process_connections_forever(self, client):
@@ -251,11 +254,11 @@ class Client:
                             Invalid command. Please input one of the following commands in the specified structure:
                             - 'scan' to scan for available File Sharing Services.
                             - 'connect <IP Address> <Port>' to connect to the server at the specified address.
-                            - 'llist'
-                            - 'rlist'
-                            - 'put <file name>'
-                            - 'get <file name>'
-                            - 'bye' to close the connection
+                            - 'llist' to list the contents of the current client directory.
+                            - 'rlist' to list the contents of the current server directory.
+                            - 'put <file name>' to upload a file to the server.
+                            - 'get <file name>' to download a file from the server.
+                            - 'bye' to close the connection.
                             """
                         )
             except Exception as msg:
