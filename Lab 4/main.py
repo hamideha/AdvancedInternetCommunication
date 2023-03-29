@@ -25,13 +25,19 @@ RX_BIND_ADDRESS = "0.0.0.0"
 
 class Server:
     HOSTNAME = socket.gethostname()
-    PORT = 50001
+    PORT = 50010
     BACKLOG = 10
 
+    # chat_rooms = [
+    #     {"room1": ("192.168.0.108", 5000)},
+    #     {"room2": ("192.168.0.108", 5040)},
+    #     {"room3": ("192.168.0.108", 5012)},
+    # ]
+
     chat_rooms = [
-        {"room1": ("192.168.0.108", 5000)},
-        {"room2": ("192.168.0.108", 5040)},
-        {"room3": ("192.168.0.108", 5012)},
+        {"room1": ("127.0.0.1", 5020)},
+        {"room2": ("127.0.0.1", 5040)},
+        {"room3": ("127.0.0.1", 5012)},
     ]
 
     def __init__(self):
@@ -200,6 +206,9 @@ class Client:
         if len(self.input_text.split()) != 2:
             print("You must enter a chat room name")
             return
+        # elif self.client_name == "":
+        #     print("Set a name before entering a chat room")
+        #     return
         else:
             chatroom_name = self.input_text.split()[1]
             chatroom_address = None
@@ -216,23 +225,26 @@ class Client:
                 print("Chat room does not exist")
                 return
             else:
-                self.chatroom_name = chatroom_name
-                self.chatroom_address = chatroom_address
-                
+                self.chatroom_address = tuple(chatroom_address)
                 self.chatroom_socket = socket.socket(
-                    socket.AF_INET, socket.SOCK_DGRAM)
-                self.chatroom_socket.bind(
-                    (self.chatroom_address[0], self.chatroom_address[1]))
+                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
                 self.chatroom_socket.setsockopt(
                     socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.TTL_BYTE)
-                
-                
+                self.chatroom_socket.setsockopt(
+                    socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.chatroom_socket.bind(
+                    self.chatroom_address)
+
                 self.chatroom_socket.sendto(f"{self.client_name} has joined the chat".encode(
                     MSG_ENCODING), self.chatroom_address)
-                self.chatroom_thread = threading.Thread(
-                    target=self.chat_listener)
-                self.chatroom_thread.start()
-                self.chat_input()
+
+                listener_thread = threading.Thread(
+                    target=self.chat_listener, daemon=True)
+                listener_thread.start()
+
+                input_thread = threading.Thread(
+                    target=self.chat_input, daemon=True)
+                input_thread.start()
 
     def chat_listener(self):
         while True:
