@@ -206,9 +206,9 @@ class Client:
         if len(self.input_text.split()) != 2:
             print("You must enter a chat room name")
             return
-        # elif self.client_name == "":
-        #     print("Set a name before entering a chat room")
-        #     return
+        elif self.client_name == "":
+            print("Set a name before entering a chat room")
+            return
         else:
             chatroom_name = self.input_text.split()[1]
             chatroom_address = None
@@ -247,26 +247,10 @@ class Client:
                 input_thread.start()
 
     def chat_listener(self):
-        while True:
-            try:
-                data, address = self.chatroom_socket.recvfrom(RECV_SIZE)
-                print(data.decode(MSG_ENCODING))
-            except Exception as msg:
-                print(msg)
-                self.chatroom_socket.close()
-                return
+        pass
 
     def chat_input(self):
-        while True:
-            try:
-                self.input_text = input("\n" + self.client_name + ": ")
-                if self.input_text != "":
-                    self.chatroom_socket.sendto(f"{self.client_name}: {self.input_text}".encode(
-                        MSG_ENCODING), self.chatroom_address)
-            except KeyboardInterrupt:
-                print(self.client_name + ": has left the chat")
-                self.chatroom_socket.close()
-                return
+        pass
 
 
 if __name__ == "__main__":
