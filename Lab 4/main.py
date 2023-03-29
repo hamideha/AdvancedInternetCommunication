@@ -218,12 +218,15 @@ class Client:
             else:
                 self.chatroom_name = chatroom_name
                 self.chatroom_address = chatroom_address
+                
                 self.chatroom_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_DGRAM)
                 self.chatroom_socket.bind(
                     (self.chatroom_address[0], self.chatroom_address[1]))
                 self.chatroom_socket.setsockopt(
                     socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.TTL_BYTE)
+                
+                
                 self.chatroom_socket.sendto(f"{self.client_name} has joined the chat".encode(
                     MSG_ENCODING), self.chatroom_address)
                 self.chatroom_thread = threading.Thread(
