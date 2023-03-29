@@ -237,14 +237,8 @@ class Client:
 
                 self.chatroom_socket.sendto(f"{self.client_name} has joined the chat".encode(
                     MSG_ENCODING), self.chatroom_address)
-
-                listener_thread = threading.Thread(
-                    target=self.chat_listener, daemon=True)
-                listener_thread.start()
-
-                input_thread = threading.Thread(
-                    target=self.chat_input, daemon=True)
-                input_thread.start()
+                
+                
 
     def chat_listener(self):
         pass
