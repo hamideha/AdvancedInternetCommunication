@@ -1,2 +1,5 @@
 *.pdf
 Howto_encrypt_and_decrypt.py
+env
+.vscode
+.DS_Store
