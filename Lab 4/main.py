@@ -120,7 +120,7 @@ class Server:
 
             if cmd == CMD["bye"]:
                 print("Client disconnected.")
-                # connection.close()
+                connection.close()
 
 
 class Client:
