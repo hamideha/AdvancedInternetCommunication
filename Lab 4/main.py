@@ -5,9 +5,9 @@ import threading
 import json
 
 CMD_FIELD_LEN = 1
-NAME_FIELD_LEN = 8
-ADDRESS_FIELD_LEN = 8
-PORT_FIELD_LEN = 8
+NAME_FIELD_LEN = 4
+ADDRESS_FIELD_LEN = 4
+PORT_FIELD_LEN = 4
 
 # JUST FOR TESTING
 CMD = {
@@ -28,11 +28,7 @@ class Server:
     PORT = 50010
     BACKLOG = 10
 
-    chat_rooms = [
-        {"room1": ("127.0.0.1", 5020)},
-        {"room2": ("127.0.0.1", 5040)},
-        {"room3": ("127.0.0.1", 5012)},
-    ]
+    chat_rooms = []
 
     def __init__(self):
         self.create_listen_socket()
@@ -44,8 +40,7 @@ class Server:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind((Server.HOSTNAME, Server.PORT))
             self.socket.listen(Server.BACKLOG)
-            print(
-                f"Chat Room Directory Server listening on on port {Server.PORT} ...")
+            print(f"Chat Room Directory Server listening on on port {Server.PORT} ...")
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -70,14 +65,12 @@ class Server:
     def connection_handler(self, client):
         connection, address_port = client
         print("-" * 72)
-        print(
-            f"Connection received from {address_port[0]} on port {address_port[1]}.")
+        print(f"Connection received from {address_port[0]} on port {address_port[1]}.")
 
         while True:
             cmd = connection.recv(CMD_FIELD_LEN)
             if cmd == CMD["getdir"]:
-                connection.sendall(json.dumps(
-                    self.chat_rooms).encode(MSG_ENCODING))
+                connection.sendall(json.dumps(self.chat_rooms).encode(MSG_ENCODING))
 
             if cmd == CMD["makeroom"]:
                 chatroom_name_len = int.from_bytes(
@@ -97,11 +90,12 @@ class Server:
                     print(
                         f"Chat room {chatroom_name} already exists at {address}:{port}."
                     )
-                    break
+                    continue
                 else:
-                    self.chat_rooms[chatroom_name] = (address, port)
-                    print(
-                        f"Chat room {chatroom_name} created at {address}:{port}.")
+                    self.chat_rooms.append(
+                        {"name": chatroom_name, "address": (address, port)}
+                    )
+                    print(f"Chat room {chatroom_name} created at {address}:{port}.")
 
             if cmd == CMD["deleteroom"]:
                 chatroom_name_len = int.from_bytes(
@@ -112,11 +106,15 @@ class Server:
                 chatroom_name = chatroom_name_bytes.decode(MSG_ENCODING)
 
                 if any(chatroom_name in room.values() for room in self.chat_rooms):
-                    print(f"Chat room {chatroom_name} does not exist")
-                    break
-                else:
-                    self.chat_rooms.remove(chatroom_name)
+                    self.chat_rooms = [
+                        room
+                        for room in self.chat_rooms
+                        if room.get("name") != chatroom_name
+                    ]
                     print(f"Chat room {chatroom_name} deleted")
+                else:
+                    print(f"Chat room {chatroom_name} does not exist")
+                    continue
 
             if cmd == CMD["bye"]:
                 print("Client disconnected.")
@@ -144,17 +142,22 @@ class Client:
         while True:
             try:
                 self.input_text = input("\nCommand: ")
-                if self.input_text != "":
+                command = self.input_text.split()[0]
+                if command != "":
                     print("Command Entered:", self.input_text)
-                    if self.input_text == "connect":
+                    if command == "connect":
                         self.connect_to_server()
-                    elif self.input_text == "getdir":
+                    elif command == "getdir":
                         self.getdir()
-                    elif self.input_text.split()[0] == "name":
+                    elif command == "deleteroom":
+                        self.delete_room()
+                    elif command == "makeroom":
+                        self.make_room()
+                    elif command == "name":
                         self.set_name()
-                    elif self.input_text.split()[0] == "chat":
+                    elif command == "chat":
                         self.chat()
-                    elif self.input_text == "bye":
+                    elif command == "bye":
                         print("Terminating connection. Goodbye!")
                         self.tcp_socket.sendall(CMD["bye"])
                         self.tcp_socket.close()
@@ -165,8 +168,6 @@ class Client:
 
             except Exception as msg:
                 print(msg)
-                self.tcp_socket.close()
-                self.create_socket()
                 continue
 
     def connect_to_server(self):
@@ -187,51 +188,97 @@ class Client:
         self.dir_list = list(getdir_decoded)
         print(json.dumps(getdir_decoded))
 
-    def set_name(self):
-        if(len(self.input_text.split()) != 2):
+    def delete_room(self):
+        if len(self.input_text.split()) < 2:
             print("Name cannot be blank")
             return
 
-        self.client_name = self.input_text.split()[1]
+        cmd = CMD["deleteroom"]
+
+        name = self.input_text.split()[1]
+        name_bytes = name.encode(MSG_ENCODING)
+
+        name_len = len(name).to_bytes(NAME_FIELD_LEN, byteorder="big")
+
+        pkt = cmd + name_len + name_bytes
+
+        self.tcp_socket.sendall(pkt)
+
+    def make_room(self):
+        if len(self.input_text.split()) < 4:
+            print("Name, address, and port must be entered")
+            return
+
+        cmd = CMD["makeroom"]
+
+        name = self.input_text.split()[1]
+        name_bytes = name.encode(MSG_ENCODING)
+
+        name_len = len(name).to_bytes(NAME_FIELD_LEN, byteorder="big")
+
+        address = self.input_text.split()[2]
+        address_bytes = socket.inet_aton(address)
+
+        port = int(self.input_text.split()[3])
+        port_bytes = port.to_bytes(PORT_FIELD_LEN, byteorder="big")
+
+        pkt = cmd + name_len + name_bytes + address_bytes + port_bytes
+
+        self.tcp_socket.sendall(pkt)
+
+    def set_name(self):
+        if len(self.input_text.split()) < 2:
+            print("Name cannot be blank")
+            return
+
+        self.client_name = " ".join(self.input_text.split()[1:])
         print(f"Name set to {self.client_name}")
         return
 
     def chat(self):
-        if len(self.input_text.split()) != 2:
+        if len(self.input_text.split()) < 2:
             print("You must enter a chat room name")
             return
-        elif self.client_name == "":
+
+        if self.client_name == "":
             print("Set a name before entering a chat room")
             return
+
+        chatroom_name = self.input_text.split()[1]
+        if self.dir_list != None:
+            chatroom = next(
+                (item for item in self.dir_list if item["name"] == chatroom_name), None
+            )
+            if chatroom:
+                self.chatroom_address = tuple(chatroom["address"])
+
         else:
-            chatroom_name = self.input_text.split()[1]
-            chatroom_address = None
-            if self.dir_list != None:
-                for dict in self.dir_list:
-                    if chatroom_name in dict:
-                        chatroom_address = tuple(dict[chatroom_name])
-                        break
-            else:
-                print(
-                    "Directory is empty. Use the getdir command to load available chat rooms.")
+            print(
+                "Directory is empty. Use the getdir command to load available chat rooms."
+            )
 
-            if (chatroom_address == None):
-                print("Chat room does not exist")
-                return
-            else:
-                self.chatroom_address = chatroom_address
-                print(type(chatroom_address))
+        if self.chatroom_address == None:
+            print("Chat room does not exist")
+            return
+        else:
+            try:
                 self.chatroom_socket = socket.socket(
-                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+                )
                 self.chatroom_socket.setsockopt(
-                    socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.TTL_BYTE)
+                    socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.TTL_BYTE
+                )
                 self.chatroom_socket.setsockopt(
-                    socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.chatroom_socket.bind(
-                    self.chatroom_address)
+                    socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
+                )
+                self.chatroom_socket.bind(self.chatroom_address)
 
-                self.chatroom_socket.sendto(f"{self.client_name} has joined the chat".encode(
-                    MSG_ENCODING), self.chatroom_address)
+                self.chatroom_socket.sendto(
+                    f"{self.client_name} has joined the chat".encode(MSG_ENCODING),
+                    self.chatroom_address,
+                )
+            except Exception as msg:
+                print(msg)
 
     def chat_listener(self):
         pass
