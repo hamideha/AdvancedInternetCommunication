@@ -28,12 +28,6 @@ class Server:
     PORT = 50010
     BACKLOG = 10
 
-    # chat_rooms = [
-    #     {"room1": ("192.168.0.108", 5000)},
-    #     {"room2": ("192.168.0.108", 5040)},
-    #     {"room3": ("192.168.0.108", 5012)},
-    # ]
-
     chat_rooms = [
         {"room1": ("127.0.0.1", 5020)},
         {"room2": ("127.0.0.1", 5040)},
@@ -215,7 +209,7 @@ class Client:
             if self.dir_list != None:
                 for dict in self.dir_list:
                     if chatroom_name in dict:
-                        chatroom_address = dict[chatroom_name]
+                        chatroom_address = tuple(dict[chatroom_name])
                         break
             else:
                 print(
@@ -225,7 +219,8 @@ class Client:
                 print("Chat room does not exist")
                 return
             else:
-                self.chatroom_address = tuple(chatroom_address)
+                self.chatroom_address = chatroom_address
+                print(type(chatroom_address))
                 self.chatroom_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
                 self.chatroom_socket.setsockopt(
@@ -237,8 +232,6 @@ class Client:
 
                 self.chatroom_socket.sendto(f"{self.client_name} has joined the chat".encode(
                     MSG_ENCODING), self.chatroom_address)
-                
-                
 
     def chat_listener(self):
         pass
