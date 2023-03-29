@@ -5,10 +5,11 @@ import threading
 import json
 
 CMD_FIELD_LEN = 1
-NAME_FIELD_LEN = 4 
-ADDRESS_FIELD_LEN = 4  
-PORT_FIELD_LEN = 4  
+NAME_FIELD_LEN = 8
+ADDRESS_FIELD_LEN = 8
+PORT_FIELD_LEN = 8
 
+# JUST FOR TESTING
 CMD = {
     "getdir": b"\x01",
     "makeroom": b"\x02",
@@ -19,13 +20,19 @@ CMD = {
 RECV_SIZE = 1024
 MSG_ENCODING = "utf-8"
 
+RX_BIND_ADDRESS = "0.0.0.0"
+
 
 class Server:
     HOSTNAME = socket.gethostname()
     PORT = 50000
     BACKLOG = 10
 
-    chat_rooms = []
+    chat_rooms = [
+        {"room1": ("192.168.0.108", 5000)},
+        {"room2": ("192.168.0.108", 5040)},
+        {"room3": ("192.168.0.108", 5012)},
+    ]
 
     def __init__(self):
         self.create_listen_socket()
@@ -70,26 +77,32 @@ class Server:
                 connection.sendall(json.dumps(self.chat_rooms).encode(MSG_ENCODING))
 
             if cmd == CMD["makeroom"]:
-                chatroom_name_len = int.from_bytes(connection.recv(NAME_FIELD_LEN), byteorder='big')
+                chatroom_name_len = int.from_bytes(
+                    connection.recv(NAME_FIELD_LEN), byteorder="big"
+                )
 
                 chatroom_name_bytes = connection.recv(chatroom_name_len)
                 chatroom_name = chatroom_name_bytes.decode(MSG_ENCODING)
-                
+
                 address_bytes = connection.recv(ADDRESS_FIELD_LEN)
                 address = socket.inet_ntoa(address_bytes)
 
                 port_bytes = connection.recv(PORT_FIELD_LEN)
-                port = int.from_bytes(port_bytes, byteorder='big')
+                port = int.from_bytes(port_bytes, byteorder="big")
 
                 if any((address, port) in room.values() for room in self.chat_rooms):
-                    print(f"Chat room {chatroom_name} already exists at {address}:{port}.")
+                    print(
+                        f"Chat room {chatroom_name} already exists at {address}:{port}."
+                    )
                     break
                 else:
                     self.chat_rooms[chatroom_name] = (address, port)
                     print(f"Chat room {chatroom_name} created at {address}:{port}.")
 
             if cmd == CMD["deleteroom"]:
-                chatroom_name_len = int.from_bytes(connection.recv(NAME_FIELD_LEN), byteorder='big')
+                chatroom_name_len = int.from_bytes(
+                    connection.recv(NAME_FIELD_LEN), byteorder="big"
+                )
 
                 chatroom_name_bytes = connection.recv(chatroom_name_len)
                 chatroom_name = chatroom_name_bytes.decode(MSG_ENCODING)
@@ -100,14 +113,68 @@ class Server:
                 else:
                     self.chat_rooms.remove(chatroom_name)
                     print(f"Chat room {chatroom_name} deleted")
-            
+
             if cmd == CMD["bye"]:
                 print("Client disconnected.")
                 connection.close()
 
+
 class Client:
+    TTL = 1  # multicast hop count
+    TTL_BYTE = TTL.to_bytes(1, byteorder="big")
+
     def __init__(self):
-        print("Cliiiient")
+        self.dir_list = None
+        self.create_socket()
+        self.get_console_input()
+
+    def create_socket(self):
+        try:
+            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        except Exception as msg:
+            print(msg)
+            sys.exit(1)
+
+    def get_console_input(self):
+        while True:
+            try:
+                self.input_text = input("\nCommand: ")
+                if self.input_text != "":
+                    print("Command Entered:", self.input_text)
+                    if self.input_text == "connect":
+                        self.connect_to_server()
+                    elif self.input_text == "getdir":
+                        self.getdir()
+                    elif self.input_text == "bye":
+                        print("Terminating connection. Goodbye!")
+                        self.tcp_socket.sendall(CMD["bye"])
+                        self.tcp_socket.close()
+                    else:
+                        print("Invalid command")
+                        continue
+
+            except Exception as msg:
+                print(msg)
+                self.tcp_socket.close()
+                self.create_socket()
+                continue
+
+    def connect_to_server(self):
+        self.create_socket()
+        try:
+            self.tcp_socket.connect((Server.HOSTNAME, Server.PORT))
+            print("Successfully connected to service")
+        except Exception as msg:
+            print(msg)
+            sys.exit(1)
+
+    def getdir(self):
+        self.tcp_socket.sendall(CMD["getdir"])
+
+        getdir_bytes = self.tcp_socket.recv(RECV_SIZE)
+        getdir_decoded = json.loads(getdir_bytes.decode(MSG_ENCODING))
+
+        print(json.dumps(getdir_decoded))
 
 
 if __name__ == "__main__":
