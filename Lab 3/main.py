@@ -159,7 +159,7 @@ class Server:
                 try:
                     file = open(filename, "wb+")
                     file.write(recv_bytes)
-                    file.close()
+                    file.close() 
                 except FileNotFoundError:
                     print(FILE_NOT_FOUND_MSG)
                     file.close()
