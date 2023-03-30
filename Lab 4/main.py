@@ -119,6 +119,7 @@ class Server:
             if cmd == CMD["bye"]:
                 print("Client disconnected.")
                 connection.close()
+                break
 
 
 class Client:
@@ -160,8 +161,6 @@ class Client:
                     elif command == "bye":
                         print("Terminating connection. Goodbye!")
                         self.tcp_socket.sendall(CMD["bye"])
-                        self.tcp_socket.close()
-                        sys.exit()
                     else:
                         print("Invalid command")
                         continue
@@ -235,6 +234,65 @@ class Client:
         print(f"Name set to {self.client_name}")
         return
 
+    def get_sockets(self):
+        try:
+            self.send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.send_socket.setsockopt(
+                socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, Client.TTL_BYTE
+            )
+
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.socket.setsockopt(
+                socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, Client.TTL_BYTE
+            )
+            self.socket.bind((RX_BIND_ADDRESS, self.chatroom_address[1]))
+
+            multicast_group_bytes = socket.inet_aton(self.chatroom_address[0])
+            multicast_iface_bytes = socket.inet_aton(RX_BIND_ADDRESS)
+
+            multicast_request = multicast_group_bytes + multicast_iface_bytes
+
+            print(
+                "Adding membership (address/interface): ",
+                self.chatroom_address[0],
+                "/",
+                RX_BIND_ADDRESS,
+            )
+            self.socket.setsockopt(
+                socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, multicast_request
+            )
+        except Exception as msg:
+            print(msg)
+            sys.exit(1)
+
+    def receive_messages(self):
+        while self.chatting:
+            try:
+                msg_bytes = self.socket.recv(RECV_SIZE)
+                msg_decode = msg_bytes.decode(MSG_ENCODING)
+                print(msg_decode)
+            except KeyboardInterrupt:
+                print("You left the chatroom.")
+                self.chatting = False
+                break
+            except:
+                sys.exit(1)
+
+    def send_messages(self):
+        while self.chatting:
+            try:
+                msg = input("chat>>")
+                sent_msg = self.client_name + ": " + msg
+                sent_msg_encoded = sent_msg.encode(MSG_ENCODING)
+                self.send_socket.sendto(sent_msg_encoded, self.chatroom_address)
+            except KeyboardInterrupt:
+                print("You left the chatroom.")
+                self.chatting = False
+                break
+            except:
+                sys.exit(1)
+
     def chat(self):
         if len(self.input_text.split()) < 2:
             print("You must enter a chat room name")
@@ -262,29 +320,21 @@ class Client:
             return
         else:
             try:
-                self.chatroom_socket = socket.socket(
-                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
-                )
-                self.chatroom_socket.setsockopt(
-                    socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.TTL_BYTE
-                )
-                self.chatroom_socket.setsockopt(
-                    socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
-                )
-                self.chatroom_socket.bind(self.chatroom_address)
+                self.get_sockets()
 
-                self.chatroom_socket.sendto(
-                    f"{self.client_name} has joined the chat".encode(MSG_ENCODING),
-                    self.chatroom_address,
+                self.chatting = True
+
+                receive_thread = threading.Thread(
+                    target=self.receive_messages, daemon=True
                 )
+                receive_thread.start()
+                self.send_messages()
+
+                self.send_socket.close()
+                self.socket.close()
             except Exception as msg:
                 print(msg)
-
-    def chat_listener(self):
-        pass
-
-    def chat_input(self):
-        pass
+                pass
 
 
 if __name__ == "__main__":
