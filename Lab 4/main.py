@@ -9,7 +9,6 @@ NAME_FIELD_LEN = 4
 ADDRESS_FIELD_LEN = 4
 PORT_FIELD_LEN = 4
 
-# JUST FOR TESTING
 CMD = {
     "getdir": b"\x01",
     "makeroom": b"\x02",
@@ -270,8 +269,8 @@ class Client:
         while self.chatting:
             try:
                 msg_bytes = self.socket.recv(RECV_SIZE)
-                msg_decode = msg_bytes.decode(MSG_ENCODING)
-                print(msg_decode)
+                msg_decoded = msg_bytes.decode(MSG_ENCODING)
+                print(msg_decoded)
             except KeyboardInterrupt:
                 print("You left the chatroom.")
                 self.chatting = False
@@ -282,7 +281,7 @@ class Client:
     def send_messages(self):
         while self.chatting:
             try:
-                msg = input("chat>>")
+                msg = input()
                 sent_msg = self.client_name + ": " + msg
                 sent_msg_encoded = sent_msg.encode(MSG_ENCODING)
                 self.send_socket.sendto(sent_msg_encoded, self.chatroom_address)
@@ -321,6 +320,7 @@ class Client:
         else:
             try:
                 self.get_sockets()
+                print("\n", "*" * 25, chatroom_name, "*" * 25)
 
                 self.chatting = True
 
