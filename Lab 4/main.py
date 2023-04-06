@@ -39,7 +39,7 @@ class Server:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind((Server.HOSTNAME, Server.PORT))
             self.socket.listen(Server.BACKLOG)
-            print(f"Chat Room Directory Server listening on on port {Server.PORT} ...")
+            print(f"Chat Room Directory Server listening on port {Server.PORT} ...")
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -119,6 +119,14 @@ class Server:
                 print("Client disconnected.")
                 connection.close()
                 break
+            # else:
+            #     print(
+            #         """
+            #         Invalid Command. Please enter one of the following accepted commands:
+
+            #         """
+            #     )
+            #     continue
 
 
 class Client:
@@ -128,6 +136,7 @@ class Client:
     def __init__(self):
         self.dir_list = None
         self.client_name = ""
+        # self.chatroom_address = ()
         self.create_socket()
         self.get_console_input()
 
@@ -149,6 +158,7 @@ class Client:
                         self.connect_to_server()
                     elif command == "getdir":
                         self.getdir()
+                        print(json.dumps(self.dir_list))
                     elif command == "deleteroom":
                         self.delete_room()
                     elif command == "makeroom":
@@ -156,6 +166,7 @@ class Client:
                     elif command == "name":
                         self.set_name()
                     elif command == "chat":
+                        self.getdir()
                         self.chat()
                     elif command == "bye":
                         print("Terminating connection. Goodbye!")
@@ -184,7 +195,6 @@ class Client:
         getdir_decoded = json.loads(getdir_bytes.decode(MSG_ENCODING))
 
         self.dir_list = list(getdir_decoded)
-        print(json.dumps(getdir_decoded))
 
     def delete_room(self):
         if len(self.input_text.split()) < 2:
